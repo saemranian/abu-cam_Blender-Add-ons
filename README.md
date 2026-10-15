@@ -1,6 +1,6 @@
 # AbuCam — Production Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & 3DGS/COLMAP Exporter for Blender
 
-[![Version](https://img.shields.io/badge/Version-v0.0.1.6-blue.svg)](https://github.com/saemranian/abu-cam_Blender-Add-ons/releases)
+[![Version](https://img.shields.io/badge/Version-v0.0.1.7-blue.svg)](https://github.com/saemranian/abu-cam_Blender-Add-ons/releases)
 [![Blender](https://img.shields.io/badge/Blender-4.2%2B%20%7C%205.1%20%7C%205.2%20LTS-orange.svg)](https://www.blender.org/)
 [![License](https://img.shields.io/badge/License-Apache_2.0%20%2F%20GPL_3.0-green.svg)](LICENSE)
 
@@ -30,12 +30,13 @@
 ### 2. Pro Environment Sky Sphere (`AbuCam_EnvSkySphere`)
 Create a finite 3D spherical environment dome mesh around your scene with inward-facing smooth normals and studio lighting controls:
 - **Controllable Sphere Radius (`0.5m – 5000m`)**: Automatically adjusts camera far-clip planes so the sky dome is never clipped.
-- **5 Material & Shader Modes**:
-  1. **Texture / HDRI Panorama (`HDRI_TEX`)**: Map any `.hdr`, `.exr`, `.png`, or `.jpg` panorama onto the sphere using **Equirectangular (360° Lat-Long)** or **Sphere UV** projection, with color tinting and an automatic procedural sky fallback.
-  2. **Procedural Physical Sky (`PROCEDURAL_SKY`)**: Physically-based Nishita/Hosek-Wilkie atmospheric sky with real-time **Sun Elevation** and **Z-Rotation (Heading)** controls.
-  3. **Studio Horizon Gradient (`GRADIENT`)**: Smooth 3-stop B-Spline cyclorama gradient (**Ground Nadir → Horizon → Zenith**).
-  4. **Solid Backdrop Color (`SOLID`)**: Clean emissive/shaded solid studio backdrop.
-  5. **Custom Scene Material (`CUSTOM_MAT`)**: Assign any existing Blender material from your project directly to the sky sphere.
+- **6 Material & Shader Modes (Default Preset: Voronoi Texture)**:
+  1. **Voronoi Texture (`VORONOI` — Default Preset)**: Procedural 3D Voronoi cellular texture with 4 styles (**Multi-Color Cells (`F1 Color`)**, **Smooth Multi-Color (`Smooth F1`)**, **Cell Distance (`Shaded`)**, and **Cell Edges / Cracks**) plus real-time **Voronoi Scale**, **Detail**, and **Randomness** controls—ideal for 3DGS / COLMAP / RealityScan background feature matching. Also registers a standalone `AbuCam_Voronoi_Material` preset in Blender's Material list.
+  2. **Texture / HDRI Panorama (`HDRI_TEX`)**: Map any `.hdr`, `.exr`, `.png`, or `.jpg` panorama onto the sphere using **Equirectangular (360° Lat-Long)** or **Sphere UV** projection, with color tinting and an automatic procedural sky fallback.
+  3. **Procedural Physical Sky (`PROCEDURAL_SKY`)**: Physically-based Nishita/Hosek-Wilkie atmospheric sky with real-time **Sun Elevation** and **Z-Rotation (Heading)** controls.
+  4. **Studio Horizon Gradient (`GRADIENT`)**: Smooth 3-stop B-Spline cyclorama gradient (**Ground Nadir → Horizon → Zenith**).
+  5. **Solid Backdrop Color (`SOLID`)**: Clean emissive/shaded solid studio backdrop.
+  6. **Custom Scene Material (`CUSTOM_MAT`)**: Assign any existing Blender material from your project directly to the sky sphere (pre-populated with `AbuCam_Voronoi_Material`).
 - **Pro Transform, Grading & Ray Visibility Controls**:
   - **Emission / Exposure Strength**, **Surface Roughness**, **Z-Rotation (`-360°` to `+360°`)**, **UV Scale U / V**, and **Mesh Segments (`16–256`)**.
   - **Ray Visibility Toggles**: Independently toggle **Camera Visibility**, **Diffuse GI**, **Specular Reflections**, and **Cast Shadows** (defaults to `OFF` so external 3-point studio lights shine through unimpeded).
@@ -76,10 +77,10 @@ Create a finite 3D spherical environment dome mesh around your scene with inward
 ## 🚀 Installation Guide
 
 ### Method 1: Install from ZIP (Recommended for Blender 4.2+ / 5.1 / 5.2 LTS)
-1. Download the latest release ZIP (`abucam_addon_v0.0.1.6.zip`) from the [`releases/`](releases/) folder or GitHub Releases page (or download this repository as a ZIP).
+1. Download the latest release ZIP (`abucam_addon_v0.0.1.7.zip`) from the [`releases/`](releases/) folder or GitHub Releases page (or download this repository as a ZIP).
 2. Open **Blender** and go to **Edit → Preferences → Add-ons** (or **Get Extensions**).
 3. Click the top-right dropdown arrow `⌄` and select **Install from Disk...**.
-4. Select `abucam_addon_v0.0.1.6.zip` and enable **AbuCam**.
+4. Select `abucam_addon_v0.0.1.7.zip` and enable **AbuCam**.
 5. In the **3D Viewport**, press `N` to open the right-hand Sidebar and click the **AbuCam** tab.
 
 ### Method 2: Manual Extension Folder Copy
@@ -99,7 +100,7 @@ Copy `__init__.py` and `blender_manifest.toml` into your Blender user extensions
    - Click **Setup Orbital Camera Rig** (or **Setup Volumetric Camera Rig**).
 3. **Configure Studio Lighting & Sky Sphere**:
    - Click **Setup 3-Point Studio Lighting** and **Add Soft Ambient Light**.
-   - Enable **Environment Sky Sphere (Pro)** to add a 3D backdrop sphere, adjust **Sphere Radius (m)**, and pick **Texture / HDRI**, **Procedural Sky**, **Studio Horizon Gradient**, **Solid**, or **Custom Material**.
+   - Enable **Environment Sky Sphere (Pro)** to add a 3D backdrop sphere (defaults to **Voronoi Texture** preset), adjust **Sphere Radius (m)**, or switch between **Voronoi Texture**, **Texture / HDRI**, **Procedural Sky**, **Studio Horizon Gradient**, **Solid**, or **Custom Material**.
 4. **Render Passes & Export Dataset**:
    - Choose **Eevee (Real-Time GPU)** or **Cycles (OptiX RTX Raytracing)**, select your desired passes (**RGB**, **Depth**, **Normal**, **Wire + RGB**), and click **Render Multi-Pass Orbit Frames** (or **Render Volumetric Multi-Camera Frames**).
    - Click **Export Cameras CSV & COLMAP** to generate non-destructive COLMAP (`cameras.txt`, `images.txt`, `points3D.ply`), RealityScan (`cameras.csv`), and NeRF (`transforms.json`) datasets.
@@ -107,6 +108,11 @@ Copy `__init__.py` and `blender_manifest.toml` into your Blender user extensions
 ---
 
 ## 📋 Changelog
+
+### `v0.0.1.7` (2026-10-15)
+- **Added Voronoi Texture Material as Default Preset for Environment Sky Sphere**:
+  - Added **`Voronoi Texture (Default Preset)`** (`VORONOI`) as the default shader mode for `AbuCam_EnvSkySphere` with 4 styles (**Multi-Color Cells (`F1 Color`)**, **Smooth Multi-Color (`Smooth F1`)**, **Cell Distance (`Shaded`)**, **Cell Edges / Cracks**) and live **Voronoi Scale**, **Detail**, and **Randomness** controls.
+  - Automatically registers a standalone **`AbuCam_Voronoi_Material`** preset data-block in `bpy.data.materials` for immediate selection in `Custom Scene Material` mode.
 
 ### `v0.0.1.6` (2026-10-15)
 - **Fixed UI Panel Draw Truncation When Environment Sky Sphere Is Enabled**:

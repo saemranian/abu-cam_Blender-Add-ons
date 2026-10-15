@@ -9,7 +9,7 @@ Compatible with Blender 4.2+, 5.1, 5.2 LTS.
 bl_info = {
     "name": "AbuCam",
     "author": "Saemranian / AbuCam Lab",
-    "version": (0, 0, 1, 6),
+    "version": (0, 0, 1, 7),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > AbuCam",
     "description": "Orbital & Volumetric Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & COLMAP Dataset Exporter",
@@ -18,7 +18,7 @@ bl_info = {
     "category": "Render",
 }
 
-ABUCAM_VERSION = "v0.0.1.6"
+ABUCAM_VERSION = "v0.0.1.7"
 
 import bpy
 import bmesh
@@ -143,7 +143,11 @@ PARAM_DEFAULTS = {
     # Environment Sky Sphere Defaults
     "use_env_sphere": False,
     "env_sphere_radius": 25.0,
-    "env_sphere_mode": 'HDRI_TEX',
+    "env_sphere_mode": 'VORONOI',
+    "env_sphere_voronoi_output": 'COLOR',
+    "env_sphere_voronoi_scale": 25.0,
+    "env_sphere_voronoi_detail": 0.0,
+    "env_sphere_voronoi_randomness": 1.0,
     "env_sphere_projection": 'EQUIRECTANGULAR',
     "env_sphere_texture_path": "",
     "env_sphere_emission": 1.0,
@@ -1286,17 +1290,85 @@ def on_light_param_update(self, context):
 # Environment Sky Sphere (Pro Feature)
 # -------------------------------------------------------------------------
 
+def ensure_voronoi_preset_material(props=None):
+    """
+    Ensures a standalone preset Voronoi Texture material ('AbuCam_Voronoi_Material') exists
+    in bpy.data.materials so it is always available as a default preset in the Material picker.
+    """
+    preset_name = "AbuCam_Voronoi_Material"
+    mat = bpy.data.materials.get(preset_name)
+    if not mat:
+        mat = bpy.data.materials.new(name=preset_name)
+        mat.use_fake_user = True
+        mat.use_nodes = True
+        try:
+            mat.use_backface_culling = False
+        except Exception:
+            pass
+        tree = mat.node_tree
+        nodes = tree.nodes
+        links = tree.links
+        nodes.clear()
+
+        out = nodes.new(type='ShaderNodeOutputMaterial')
+        out.location = (550, 0)
+
+        bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+        bsdf.location = (250, 0)
+        if 'Roughness' in bsdf.inputs:
+            bsdf.inputs['Roughness'].default_value = 1.0
+        if 'Emission Strength' in bsdf.inputs:
+            bsdf.inputs['Emission Strength'].default_value = 1.0
+
+        tex_coord = nodes.new(type='ShaderNodeTexCoord')
+        tex_coord.location = (-600, 0)
+
+        mapping = nodes.new(type='ShaderNodeMapping')
+        mapping.location = (-380, 0)
+
+        voronoi = nodes.new(type='ShaderNodeTexVoronoi')
+        voronoi.location = (-120, 80)
+        try:
+            voronoi.voronoi_dimensions = '3D'
+            voronoi.feature = 'F1'
+        except Exception:
+            pass
+        if 'Scale' in voronoi.inputs:
+            voronoi.inputs['Scale'].default_value = float(getattr(props, 'env_sphere_voronoi_scale', 25.0)) if props else 25.0
+        if 'Detail' in voronoi.inputs:
+            voronoi.inputs['Detail'].default_value = float(getattr(props, 'env_sphere_voronoi_detail', 0.0)) if props else 0.0
+        if 'Randomness' in voronoi.inputs:
+            voronoi.inputs['Randomness'].default_value = float(getattr(props, 'env_sphere_voronoi_randomness', 1.0)) if props else 1.0
+
+        links.new(tex_coord.outputs['Generated'], mapping.inputs['Vector'])
+        links.new(mapping.outputs['Vector'], voronoi.inputs['Vector'])
+        links.new(voronoi.outputs['Color'], bsdf.inputs['Base Color'])
+        if 'Emission Color' in bsdf.inputs:
+            links.new(voronoi.outputs['Color'], bsdf.inputs['Emission Color'])
+        elif 'Emission' in bsdf.inputs:
+            links.new(voronoi.outputs['Color'], bsdf.inputs['Emission'])
+        links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
+    return mat
+
+
 def build_env_sphere_material(props):
     """
     Creates or updates the 'AbuCam_EnvSkySphere_Mat' material according to props.env_sphere_mode:
+    - 'VORONOI': Procedural 3D Voronoi Texture (Multi-Color Cells / Distance / Smooth F1 / Edges) - Default Preset
     - 'HDRI_TEX': Equirectangular or UV Image/HDRI Panorama Texture with Emission & Tint
     - 'PROCEDURAL_SKY': Physically-based atmospheric Sky Texture (Nishita/Hosek)
     - 'GRADIENT': Smooth 3-stop studio cyclorama gradient (Ground -> Horizon -> Zenith)
     - 'SOLID': Uniform solid backdrop color with controllable emission and roughness
-    - 'CUSTOM_MAT': Uses user-selected material directly
+    - 'CUSTOM_MAT': Uses user-selected material directly (defaults to AbuCam_Voronoi_Material preset)
     """
-    if props.env_sphere_mode == 'CUSTOM_MAT' and props.env_sphere_custom_mat:
-        return props.env_sphere_custom_mat
+    preset_voronoi = ensure_voronoi_preset_material(props)
+    if props.env_sphere_mode == 'CUSTOM_MAT':
+        if not props.env_sphere_custom_mat:
+            try:
+                props.env_sphere_custom_mat = preset_voronoi
+            except Exception:
+                pass
+        return props.env_sphere_custom_mat or preset_voronoi
 
     mat_name = "AbuCam_EnvSkySphere_Mat"
     mat = bpy.data.materials.get(mat_name)
@@ -1341,7 +1413,51 @@ def build_env_sphere_material(props):
     mode = props.env_sphere_mode
     color_socket = None
 
-    if mode == 'HDRI_TEX':
+    if mode == 'VORONOI':
+        links.new(tex_coord.outputs['Generated'], mapping.inputs['Vector'])
+        voronoi = nodes.new(type='ShaderNodeTexVoronoi')
+        voronoi.location = (-180, 100)
+        v_out_mode = getattr(props, 'env_sphere_voronoi_output', 'COLOR')
+        try:
+            voronoi.voronoi_dimensions = '3D'
+            if v_out_mode == 'SMOOTH_COLOR':
+                voronoi.feature = 'SMOOTH_F1'
+                if 'Smoothness' in voronoi.inputs:
+                    voronoi.inputs['Smoothness'].default_value = 1.0
+            elif v_out_mode == 'EDGES':
+                voronoi.feature = 'DISTANCE_TO_EDGE'
+            else:
+                voronoi.feature = 'F1'
+        except Exception:
+            pass
+
+        if 'Scale' in voronoi.inputs:
+            voronoi.inputs['Scale'].default_value = float(getattr(props, 'env_sphere_voronoi_scale', 25.0))
+        if 'Detail' in voronoi.inputs:
+            voronoi.inputs['Detail'].default_value = float(getattr(props, 'env_sphere_voronoi_detail', 0.0))
+        if 'Randomness' in voronoi.inputs:
+            voronoi.inputs['Randomness'].default_value = float(getattr(props, 'env_sphere_voronoi_randomness', 1.0))
+
+        links.new(mapping.outputs['Vector'], voronoi.inputs['Vector'])
+
+        if v_out_mode in ('DISTANCE', 'EDGES'):
+            mix_rgb = nodes.new(type='ShaderNodeMix')
+            mix_rgb.data_type = 'RGBA'
+            mix_rgb.blend_type = 'MULTIPLY'
+            mix_rgb.location = (80, 100)
+            mix_rgb.inputs['Factor'].default_value = 1.0
+            mix_rgb.inputs['B'].default_value = (
+                props.env_sphere_color[0],
+                props.env_sphere_color[1],
+                props.env_sphere_color[2],
+                1.0
+            )
+            links.new(voronoi.outputs['Distance'], mix_rgb.inputs['A'])
+            color_socket = mix_rgb.outputs['Result']
+        else:
+            color_socket = voronoi.outputs['Color']
+
+    elif mode == 'HDRI_TEX':
         # Load image from file path if specified, or from image pointer
         img = props.env_sphere_image
         if props.env_sphere_texture_path:
@@ -1891,13 +2007,44 @@ class AbuCamProperties(bpy.types.PropertyGroup):
         name="Material / Sky Mode",
         description="Material and shader type for the environment sky sphere",
         items=[
+            ('VORONOI', "Voronoi Texture (Default Preset)", "Procedural 3D Voronoi cell texture preset (ideal for 3DGS / COLMAP / Photogrammetry feature matching)"),
             ('HDRI_TEX', "Texture / HDRI Panorama", "Map an equirectangular HDRI/EXR or image texture onto the sky sphere"),
             ('PROCEDURAL_SKY', "Procedural Physical Sky", "Physically-based atmospheric sky dome (Nishita / Hosek-Wilkie)"),
             ('GRADIENT', "Studio Horizon Gradient", "Smooth 3-stop studio cyclorama gradient (Ground -> Horizon -> Zenith)"),
             ('SOLID', "Solid Backdrop Color", "Uniform solid color emissive/shaded backdrop sphere"),
-            ('CUSTOM_MAT', "Custom Scene Material", "Assign any existing Blender material from the scene"),
+            ('CUSTOM_MAT', "Custom Scene Material", "Assign any existing Blender material from the scene (includes AbuCam_Voronoi_Material preset)"),
         ],
-        default='HDRI_TEX',
+        default='VORONOI',
+        update=on_env_sphere_update
+    )
+    env_sphere_voronoi_output: EnumProperty(
+        name="Voronoi Style",
+        description="Voronoi texture feature and color output mode",
+        items=[
+            ('COLOR', "Multi-Color Cells (F1 Color)", "Distinct random RGB color per Voronoi cell (best for 3DGS / COLMAP background feature matching)"),
+            ('SMOOTH_COLOR', "Smooth Multi-Color (Smooth F1)", "Smoothly blended multi-color Voronoi cells"),
+            ('DISTANCE', "Cell Distance (Shaded)", "Cellular distance gradient from cell center to border, tinted by Backdrop Color"),
+            ('EDGES', "Cell Edges / Cracks", "Distance-to-edge cellular border lines, tinted by Backdrop Color"),
+        ],
+        default='COLOR',
+        update=on_env_sphere_update
+    )
+    env_sphere_voronoi_scale: FloatProperty(
+        name="Voronoi Scale",
+        description="Scale / frequency of Voronoi cells across the environment sky sphere",
+        default=25.0, min=0.1, max=1000.0, step=50,
+        update=on_env_sphere_update
+    )
+    env_sphere_voronoi_detail: FloatProperty(
+        name="Voronoi Detail",
+        description="Fractal detail levels of the Voronoi texture (0 = clean cells)",
+        default=0.0, min=0.0, max=15.0, step=10,
+        update=on_env_sphere_update
+    )
+    env_sphere_voronoi_randomness: FloatProperty(
+        name="Voronoi Randomness",
+        description="Randomness of Voronoi cell distribution (1.0 = organic cells, 0.0 = regular grid)",
+        default=1.0, min=0.0, max=1.0, subtype='FACTOR',
         update=on_env_sphere_update
     )
     env_sphere_projection: EnumProperty(
@@ -2492,7 +2639,9 @@ class ABUCAM_OT_ResetEnvSphere(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.abucam_props
         env_keys = [
-            "env_sphere_radius", "env_sphere_mode", "env_sphere_projection",
+            "env_sphere_radius", "env_sphere_mode", "env_sphere_voronoi_output",
+            "env_sphere_voronoi_scale", "env_sphere_voronoi_detail",
+            "env_sphere_voronoi_randomness", "env_sphere_projection",
             "env_sphere_texture_path", "env_sphere_emission", "env_sphere_roughness",
             "env_sphere_color", "env_sphere_zenith_color", "env_sphere_ground_color",
             "env_sphere_sun_elevation", "env_sphere_rotation_z", "env_sphere_scale_u",
@@ -2505,7 +2654,7 @@ class ABUCAM_OT_ResetEnvSphere(bpy.types.Operator):
             if k in PARAM_DEFAULTS:
                 setattr(props, k, PARAM_DEFAULTS[k])
         props.env_sphere_image = None
-        props.env_sphere_custom_mat = None
+        props.env_sphere_custom_mat = ensure_voronoi_preset_material(props)
         update_env_sky_sphere(context.scene)
         self.report({'INFO'}, "Environment Sky Sphere parameters reset to defaults.")
         return {'FINISHED'}
@@ -4270,7 +4419,29 @@ class VIEW3D_PT_AbuCamPanel(bpy.types.Panel):
             row_mode.prop(props, "env_sphere_mode", text="Mode")
             row_mode.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "env_sphere_mode"
 
-            if props.env_sphere_mode == 'HDRI_TEX':
+            if props.env_sphere_mode == 'VORONOI':
+                row_vo = col_e.row(align=True)
+                row_vo.prop(props, "env_sphere_voronoi_output", text="Style")
+                row_vo.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "env_sphere_voronoi_output"
+
+                row_vs = col_e.row(align=True)
+                row_vs.prop(props, "env_sphere_voronoi_scale", slider=True, text="Voronoi Scale")
+                row_vs.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "env_sphere_voronoi_scale"
+
+                row_vd = col_e.row(align=True)
+                row_vd.prop(props, "env_sphere_voronoi_detail", slider=True, text="Detail")
+                row_vd.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "env_sphere_voronoi_detail"
+
+                row_vr = col_e.row(align=True)
+                row_vr.prop(props, "env_sphere_voronoi_randomness", slider=True, text="Randomness")
+                row_vr.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "env_sphere_voronoi_randomness"
+
+                if props.env_sphere_voronoi_output in ('DISTANCE', 'EDGES'):
+                    row_vc = col_e.row(align=True)
+                    row_vc.prop(props, "env_sphere_color", text="Tint Color")
+                    row_vc.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "env_sphere_color"
+
+            elif props.env_sphere_mode == 'HDRI_TEX':
                 row_proj = col_e.row(align=True)
                 row_proj.prop(props, "env_sphere_projection", text="Map")
                 col_e.prop(props, "env_sphere_texture_path", text="File")
