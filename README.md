@@ -1,6 +1,6 @@
 # AbuCam — Production Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & 3DGS/COLMAP Exporter for Blender
 
-[![Version](https://img.shields.io/badge/Version-v0.0.1.7-blue.svg)](https://github.com/saemranian/abu-cam_Blender-Add-ons/releases)
+[![Version](https://img.shields.io/badge/Version-v0.0.1.8-blue.svg)](https://github.com/saemranian/abu-cam_Blender-Add-ons/releases)
 [![Blender](https://img.shields.io/badge/Blender-4.2%2B%20%7C%205.1%20%7C%205.2%20LTS-orange.svg)](https://www.blender.org/)
 [![License](https://img.shields.io/badge/License-Apache_2.0%20%2F%20GPL_3.0-green.svg)](LICENSE)
 
@@ -23,7 +23,7 @@
     - **Latitude Rings (Tiers)**: Concentric horizontal elevation rings around the subject.
     - **Jittered / Random**: Stratified random spherical coverage.
   - **3 Angular Sector Limits**: Precisely constrain the camera dome using **Azimuth Span (`10°–360°`)**, **Heading Offset (`-180°` to `+180°`)**, **Elevation Min (Zenith Cutoff)**, and **Elevation Max (Floor Cutoff)**.
-  - **Independent Sensor W & Sensor H Optics**: Real-time control over **Focal Length (`mm`)**, **Sensor Width (`mm`)**, and **Sensor Height (`mm`)**, plus live synchronization of render resolution (**W × H**), **Total Frames**, and **FPS**.
+  - **Independent Sensor W & Sensor H Optics + 3D Frustum Scale**: Real-time control over **Focal Length (`mm`)**, **Sensor Width (`mm`)**, **Sensor Height (`mm`)**, and **3D Viewport Frustum Scale (`0.01 – 10.0`, default `0.25`)**, plus live synchronization of render resolution (**W × H**), **Total Frames**, and **FPS**.
 
 ---
 
@@ -77,10 +77,10 @@ Create a finite 3D spherical environment dome mesh around your scene with inward
 ## 🚀 Installation Guide
 
 ### Method 1: Install from ZIP (Recommended for Blender 4.2+ / 5.1 / 5.2 LTS)
-1. Download the latest release ZIP (`abucam_addon_v0.0.1.7.zip`) from the [`releases/`](releases/) folder or GitHub Releases page (or download this repository as a ZIP).
+1. Download the latest release ZIP (`abucam_addon_v0.0.1.8.zip`) from the [`releases/`](releases/) folder or GitHub Releases page (or download this repository as a ZIP).
 2. Open **Blender** and go to **Edit → Preferences → Add-ons** (or **Get Extensions**).
 3. Click the top-right dropdown arrow `⌄` and select **Install from Disk...**.
-4. Select `abucam_addon_v0.0.1.7.zip` and enable **AbuCam**.
+4. Select `abucam_addon_v0.0.1.8.zip` and enable **AbuCam**.
 5. In the **3D Viewport**, press `N` to open the right-hand Sidebar and click the **AbuCam** tab.
 
 ### Method 2: Manual Extension Folder Copy
@@ -108,6 +108,10 @@ Copy `__init__.py` and `blender_manifest.toml` into your Blender user extensions
 ---
 
 ## 📋 Changelog
+
+### `v0.0.1.8` (2026-10-16)
+- **Added 3D Viewport Camera Frustum Display Scale (`Frustum Scale`)**:
+  - Added a real-time **`Frustum Scale` (`frustum_display_size`)** slider (`0.01 – 10.0`, default `0.25`) with a Reset button in both **Volumetric Camera Rig** (*Camera Optics & Sensor Size*) and **Orbital Camera Rig**, allowing instant scaling of camera frustum wireframes in the 3D Viewport (even across 500 Volumetric cameras) without altering focal length, sensor size, or rendered output.
 
 ### `v0.0.1.7` (2026-10-15)
 - **Added Voronoi Texture Material as Default Preset for Environment Sky Sphere**:

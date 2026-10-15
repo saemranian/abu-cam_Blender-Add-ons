@@ -9,7 +9,7 @@ Compatible with Blender 4.2+, 5.1, 5.2 LTS.
 bl_info = {
     "name": "AbuCam",
     "author": "Saemranian / AbuCam Lab",
-    "version": (0, 0, 1, 7),
+    "version": (0, 0, 1, 8),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > AbuCam",
     "description": "Orbital & Volumetric Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & COLMAP Dataset Exporter",
@@ -18,7 +18,7 @@ bl_info = {
     "category": "Render",
 }
 
-ABUCAM_VERSION = "v0.0.1.7"
+ABUCAM_VERSION = "v0.0.1.8"
 
 import bpy
 import bmesh
@@ -197,6 +197,7 @@ PARAM_DEFAULTS = {
     "vol_azimuth_center_deg": 0.0,
     "vol_show_guide_dome": True,
     "vol_active_cam_index": 1,
+    "frustum_display_size": 0.25,
 }
 
 # -------------------------------------------------------------------------
@@ -662,6 +663,7 @@ def update_orbital_rig(scene, bake_keyframes=False):
     cam.sensor_fit = 'AUTO'
     cam.sensor_width = 36.0
     cam.sensor_height = 24.0
+    cam.display_size = max(0.005, float(getattr(props, 'frustum_display_size', 0.25)))
     cam.clip_start = 0.05
     cam.clip_end = max(500.0, getattr(props, 'env_sphere_radius', 25.0) * 2.5)
 
@@ -1097,6 +1099,7 @@ def update_volumetric_rig(scene):
         cam.sensor_fit = 'HORIZONTAL'
         cam.sensor_width = sw
         cam.sensor_height = sh
+        cam.display_size = max(0.005, float(getattr(props, 'frustum_display_size', 0.25)))
         cam.clip_start = 0.05
         cam.clip_end = far_clip
 
@@ -1216,6 +1219,23 @@ def on_volumetric_param_update(self, context):
         return
     scene = getattr(context, 'scene', None) or bpy.context.scene
     update_volumetric_rig(scene)
+
+
+def on_frustum_size_update(self, context):
+    """Fast callback to update 3D Viewport camera frustum display scale across all Orbital & Volumetric cameras."""
+    sz = max(0.005, float(getattr(self, 'frustum_display_size', 0.25)))
+    for cam_data in bpy.data.cameras:
+        if cam_data.name == "OrbitalCamera" or cam_data.name.startswith("AbuCam_Vol_") or cam_data.name.startswith("VolCam_"):
+            cam_data.display_size = sz
+    scene = getattr(context, 'scene', None) or bpy.context.scene
+    if scene:
+        for obj in scene.objects:
+            if obj.type == 'CAMERA' and (obj.name == "OrbitalCamera" or obj.name.startswith("AbuCam_Vol_") or obj.name.startswith("VolCam_")):
+                obj.data.display_size = sz
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
 
 
 def on_active_cam_index_update(self, context):
@@ -1749,6 +1769,12 @@ class AbuCamProperties(bpy.types.PropertyGroup):
         description="Camera sensor height in mm (Full Frame 35mm standard: 24mm)",
         default=24.0, min=1.0, max=100.0,
         update=on_volumetric_param_update
+    )
+    frustum_display_size: FloatProperty(
+        name="Frustum Scale",
+        description="Visual display scale of camera frustum wireframes in the 3D Viewport (does not affect FOV, focal length, or rendered output)",
+        default=0.25, min=0.01, max=10.0, step=5,
+        update=on_frustum_size_update
     )
     vol_distribution: EnumProperty(
         name="Distribution",
@@ -2455,6 +2481,8 @@ class ABUCAM_OT_ResetParam(bpy.types.Operator):
 
         if p in ("use_ambient_light", "ambient_intensity", "ambient_color", "key_intensity", "fill_intensity", "rim_intensity"):
             on_light_param_update(props, context)
+        elif p == "frustum_display_size":
+            on_frustum_size_update(props, context)
         elif p.startswith("env_sphere_") or p == "use_env_sphere":
             update_env_sky_sphere(context.scene)
         elif p.startswith("vol_") or getattr(props, 'rig_mode', 'ORBITAL') == 'VOLUMETRIC':
@@ -2514,7 +2542,8 @@ class ABUCAM_OT_ResetRig(bpy.types.Operator):
             "azimuth_deg", "elevation_deg", "path_tilt_deg",
             "orbit_mode", "arc_start_deg", "arc_end_deg",
             "show_path_guide", "orbit_radius", "focal_length",
-            "total_frames", "fps", "resolution_x", "resolution_y"
+            "frustum_display_size", "total_frames", "fps",
+            "resolution_x", "resolution_y"
         ]
         for k in rig_keys:
             if k in PARAM_DEFAULTS:
@@ -2534,8 +2563,8 @@ class ABUCAM_OT_ResetVolumetricRig(bpy.types.Operator):
         props = context.scene.abucam_props
         vol_keys = [
             "vol_camera_count", "vol_sphere_radius", "vol_focal_length",
-            "vol_sensor_width", "vol_sensor_height", "vol_distribution",
-            "vol_azimuth_span_deg", "vol_azimuth_center_deg",
+            "vol_sensor_width", "vol_sensor_height", "frustum_display_size",
+            "vol_distribution", "vol_azimuth_span_deg", "vol_azimuth_center_deg",
             "vol_elevation_min_deg", "vol_elevation_max_deg",
             "vol_show_guide_dome", "vol_active_cam_index",
             "total_frames", "fps", "resolution_x", "resolution_y",
@@ -4223,6 +4252,10 @@ class VIEW3D_PT_AbuCamPanel(bpy.types.Panel):
             row_fl.prop(props, "focal_length")
             row_fl.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "focal_length"
 
+            row_fs = col.row(align=True)
+            row_fs.prop(props, "frustum_display_size", slider=True, text="Frustum Scale")
+            row_fs.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "frustum_display_size"
+
             row_tf = col.row(align=True)
             row_tf.prop(props, "total_frames")
             row_tf.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "total_frames"
@@ -4296,6 +4329,10 @@ class VIEW3D_PT_AbuCamPanel(bpy.types.Panel):
             row_sens.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "vol_sensor_width"
             row_sens.prop(props, "vol_sensor_height", text="Sensor H (mm)")
             row_sens.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "vol_sensor_height"
+
+            row_vfs = box_opt.row(align=True)
+            row_vfs.prop(props, "frustum_display_size", slider=True, text="Frustum Scale")
+            row_vfs.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "frustum_display_size"
 
             # Target Tracking & Rig Center
             box_target = col.box()
