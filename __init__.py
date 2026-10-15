@@ -9,7 +9,7 @@ Compatible with Blender 4.2+, 5.1, 5.2 LTS.
 bl_info = {
     "name": "AbuCam",
     "author": "Saemranian / AbuCam Lab",
-    "version": (0, 0, 1, 8),
+    "version": (0, 0, 1, 9),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > AbuCam",
     "description": "Orbital & Volumetric Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & COLMAP Dataset Exporter",
@@ -18,7 +18,7 @@ bl_info = {
     "category": "Render",
 }
 
-ABUCAM_VERSION = "v0.0.1.8"
+ABUCAM_VERSION = "v0.0.1.9"
 
 import bpy
 import bmesh
@@ -196,6 +196,8 @@ PARAM_DEFAULTS = {
     "vol_elevation_max_deg": math.radians(90.0),
     "vol_azimuth_center_deg": 0.0,
     "vol_show_guide_dome": True,
+    "vol_show_camera_lines": True,
+    "vol_show_center_lines": False,
     "vol_active_cam_index": 1,
     "frustum_display_size": 0.25,
 }
@@ -949,12 +951,32 @@ def calculate_volumetric_camera_positions(props):
     return positions
 
 
+def set_viewport_relationship_lines(visible):
+    """Synchronizes 3D Viewport overlay relationship lines (dashed constraint lines to target)."""
+    try:
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    for space in area.spaces:
+                        if space.type == 'VIEW_3D' and hasattr(space, 'overlay'):
+                            space.overlay.show_relationship_lines = bool(visible)
+                    area.tag_redraw()
+    except Exception:
+        pass
+
+
 def update_volumetric_guide(scene, props, camera_positions, aim_pos):
     """Creates or updates a 3D visual guide mesh of the volumetric dome and camera positions."""
     guide_name = "AbuCam_VolumetricGuide"
     mesh_data_name = "AbuCam_VolumetricGuideMesh"
 
-    if not getattr(props, 'vol_show_guide_dome', True):
+    show_master = getattr(props, 'vol_show_guide_dome', True)
+    show_cam_lines = show_master and getattr(props, 'vol_show_camera_lines', True)
+    show_ctr_lines = show_master and getattr(props, 'vol_show_center_lines', False)
+
+    set_viewport_relationship_lines(show_ctr_lines)
+
+    if not show_master or (not show_cam_lines and not show_ctr_lines):
         old = bpy.data.objects.get(guide_name)
         if old:
             old.hide_viewport = True
@@ -968,10 +990,12 @@ def update_volumetric_guide(scene, props, camera_positions, aim_pos):
     edges = []
     for i, cp in enumerate(camera_positions):
         verts.append(cp)
-        edges.append((0, i + 1))  # Ray from aim center to camera
+        if show_ctr_lines:
+            edges.append((0, i + 1))  # Ray from aim center to camera
 
-    for i in range(len(camera_positions) - 1):
-        edges.append((i + 1, i + 2))
+    if show_cam_lines:
+        for i in range(len(camera_positions) - 1):
+            edges.append((i + 1, i + 2))  # Line between consecutive cameras
 
     mesh.clear_geometry()
     mesh.from_pydata(verts, edges, [])
@@ -1232,6 +1256,24 @@ def on_frustum_size_update(self, context):
         for obj in scene.objects:
             if obj.type == 'CAMERA' and (obj.name == "OrbitalCamera" or obj.name.startswith("AbuCam_Vol_") or obj.name.startswith("VolCam_")):
                 obj.data.display_size = sz
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+
+
+def on_guide_lines_update(self, context):
+    """Fast callback to immediately toggle 3D guide lines between cameras and center without rebuilding cameras."""
+    scene = getattr(context, 'scene', None) or bpy.context.scene
+    if not scene:
+        return
+    target_empty = bpy.data.objects.get("AbuCam_Target")
+    if target_empty:
+        aim_pos = target_empty.location.copy()
+    else:
+        aim_pos = Vector((getattr(self, 'target_x', 0.0), getattr(self, 'target_y', 0.0), getattr(self, 'target_z', 0.0)))
+    positions = calculate_volumetric_camera_positions(self)
+    update_volumetric_guide(scene, self, positions, aim_pos)
     for window in bpy.context.window_manager.windows:
         for area in window.screen.areas:
             if area.type == 'VIEW_3D':
@@ -1830,9 +1872,21 @@ class AbuCamProperties(bpy.types.PropertyGroup):
     )
     vol_show_guide_dome: BoolProperty(
         name="Show 3D Dome Guide",
-        description="Show visual wireframe dome and camera point markers in viewport",
+        description="Master toggle for 3D viewport camera guide lines",
         default=True,
-        update=on_volumetric_param_update
+        update=on_guide_lines_update
+    )
+    vol_show_camera_lines: BoolProperty(
+        name="Lines Between Cameras",
+        description="Toggle the 3D path line connecting consecutive cameras around the volumetric sphere",
+        default=True,
+        update=on_guide_lines_update
+    )
+    vol_show_center_lines: BoolProperty(
+        name="Center Target Lines",
+        description="Toggle radial sightlines and relationship lines connecting each camera to the target center",
+        default=False,
+        update=on_guide_lines_update
     )
     vol_active_cam_index: IntProperty(
         name="Active View Camera",
@@ -2566,7 +2620,8 @@ class ABUCAM_OT_ResetVolumetricRig(bpy.types.Operator):
             "vol_sensor_width", "vol_sensor_height", "frustum_display_size",
             "vol_distribution", "vol_azimuth_span_deg", "vol_azimuth_center_deg",
             "vol_elevation_min_deg", "vol_elevation_max_deg",
-            "vol_show_guide_dome", "vol_active_cam_index",
+            "vol_show_guide_dome", "vol_show_camera_lines", "vol_show_center_lines",
+            "vol_active_cam_index",
             "total_frames", "fps", "resolution_x", "resolution_y",
         ]
         for k in vol_keys:
@@ -4360,7 +4415,11 @@ class VIEW3D_PT_AbuCamPanel(bpy.types.Panel):
             row_z.prop(props, "target_z", text="Center Z (Height)")
             row_z.operator("abucam.reset_param", text="", icon='LOOP_BACK').param = "target_z"
 
-            col.prop(props, "vol_show_guide_dome")
+            col.prop(props, "vol_show_guide_dome", text="Show 3D Dome Guide Lines")
+            if props.vol_show_guide_dome:
+                row_gl = col.row(align=True)
+                row_gl.prop(props, "vol_show_camera_lines", text="Lines Between Cameras", toggle=True)
+                row_gl.prop(props, "vol_show_center_lines", text="Center Target Lines", toggle=True)
 
             col.separator()
             row_tf = col.row(align=True)
