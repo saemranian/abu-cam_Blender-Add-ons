@@ -1,8 +1,8 @@
 schema_version = "1.0.0"
 
 id = "abucam_addon"
-version = "0.0.15"
-name = "AbuCam (v0.0.1.5)"
+version = "0.0.16"
+name = "AbuCam (v0.0.1.6)"
 tagline = "Orbital & Volumetric Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & COLMAP Exporter"
 maintainer = "Saemranian / AbuCam Lab"
 type = "add-on"

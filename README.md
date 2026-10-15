@@ -1,6 +1,6 @@
 # AbuCam — Production Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & 3DGS/COLMAP Exporter for Blender
 
-[![Version](https://img.shields.io/badge/Version-v0.0.1.5-blue.svg)](https://github.com/saemranian/abu-cam_Blender-Add-ons/releases)
+[![Version](https://img.shields.io/badge/Version-v0.0.1.6-blue.svg)](https://github.com/saemranian/abu-cam_Blender-Add-ons/releases)
 [![Blender](https://img.shields.io/badge/Blender-4.2%2B%20%7C%205.1%20%7C%205.2%20LTS-orange.svg)](https://www.blender.org/)
 [![License](https://img.shields.io/badge/License-Apache_2.0%20%2F%20GPL_3.0-green.svg)](LICENSE)
 
@@ -76,10 +76,10 @@ Create a finite 3D spherical environment dome mesh around your scene with inward
 ## 🚀 Installation Guide
 
 ### Method 1: Install from ZIP (Recommended for Blender 4.2+ / 5.1 / 5.2 LTS)
-1. Download the latest release ZIP (`abucam_addon_v0.0.1.5.zip`) from the [`releases/`](releases/) folder or GitHub Releases page (or download this repository as a ZIP).
+1. Download the latest release ZIP (`abucam_addon_v0.0.1.6.zip`) from the [`releases/`](releases/) folder or GitHub Releases page (or download this repository as a ZIP).
 2. Open **Blender** and go to **Edit → Preferences → Add-ons** (or **Get Extensions**).
 3. Click the top-right dropdown arrow `⌄` and select **Install from Disk...**.
-4. Select `abucam_addon_v0.0.1.5.zip` and enable **AbuCam**.
+4. Select `abucam_addon_v0.0.1.6.zip` and enable **AbuCam**.
 5. In the **3D Viewport**, press `N` to open the right-hand Sidebar and click the **AbuCam** tab.
 
 ### Method 2: Manual Extension Folder Copy
@@ -107,6 +107,10 @@ Copy `__init__.py` and `blender_manifest.toml` into your Blender user extensions
 ---
 
 ## 📋 Changelog
+
+### `v0.0.1.6` (2026-10-15)
+- **Fixed UI Panel Draw Truncation When Environment Sky Sphere Is Enabled**:
+  - Replaced deprecated `VISIBLE_IPO_ON` icon on the *Ray Visibility & Pass Masking* box header with Blender 5.2-compatible `HIDE_OFF`, preventing `UILayout.label()` from raising an exception that truncated the **Multi-Pass Reference Engine** and **Dataset & Video Export** sections below it.
 
 ### `v0.0.1.5` (2026-10-15)
 - **Added Pro Environment Sky Sphere (`AbuCam_EnvSkySphere`)**:

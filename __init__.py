@@ -9,7 +9,7 @@ Compatible with Blender 4.2+, 5.1, 5.2 LTS.
 bl_info = {
     "name": "AbuCam",
     "author": "Saemranian / AbuCam Lab",
-    "version": (0, 0, 1, 5),
+    "version": (0, 0, 1, 6),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > AbuCam",
     "description": "Orbital & Volumetric Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & COLMAP Dataset Exporter",
@@ -18,7 +18,7 @@ bl_info = {
     "category": "Render",
 }
 
-ABUCAM_VERSION = "v0.0.1.5"
+ABUCAM_VERSION = "v0.0.1.6"
 
 import bpy
 import bmesh
@@ -4324,7 +4324,7 @@ class VIEW3D_PT_AbuCamPanel(bpy.types.Panel):
             col_e.prop(props, "env_sphere_follow_target", text="Lock Center to Target Rig (X, Y, Z)")
 
             box_ray = col_e.box()
-            box_ray.label(text="Ray Visibility & Pass Masking:", icon='VISIBLE_IPO_ON')
+            box_ray.label(text="Ray Visibility & Pass Masking:", icon='HIDE_OFF')
             row_rv1 = box_ray.row(align=True)
             row_rv1.prop(props, "env_sphere_visible_camera", text="Camera")
             row_rv1.prop(props, "env_sphere_visible_diffuse", text="Diffuse GI")
