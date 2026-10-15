@@ -1,0 +1,19 @@
+schema_version = "1.0.0"
+
+id = "abucam_addon"
+version = "0.0.15"
+name = "AbuCam (v0.0.1.5)"
+tagline = "Orbital & Volumetric Camera Rig, Environment Sky Sphere, Multi-Pass Renderer & COLMAP Exporter"
+maintainer = "Saemranian / AbuCam Lab"
+type = "add-on"
+website = "https://github.com/saemranian/abu-cam_Blender-Add-ons"
+blender_version_min = "4.2.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+tags = ["Animation", "Render", "Camera"]
+
+[permissions]
+files = "Read and write rendered image frames, videos, and COLMAP camera files"
